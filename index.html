@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Проект</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <style>
+        canvas {
+            margin: 20px auto;
+            display: block;
+            width: 800px;
+            box-shadow: 0 0 2px 2px rgba(68, 68, 65, 0.205)
+        }
+
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <canvas id="game" width="800" height="400"></canvas>
+    </div>
+
+    <script>
+        game.width = document.documentElement.clientWidth;
+        game.height = document.documentElement.clientHeight;
+
+        let ctx = game.getContext('2d');
+
+
+
+
+        // == ОПИСАНИЕ КЛАССОВ ========================================================
+
+
+        class Circle {
+            constructor(x, y, r, imgUrl) {
+                this.x = x;
+                this.y = y;
+                this.r = r;
+                this.img = new Image();
+                this.img.src = imgUrl;
+
+                this.draw();
+            }
+
+            draw() {
+                ctx.drawImage(this.img, this.x - this.r, this.y - this.r, this.r * 2, this.r * 2);
+            }
+
+            getDistanceTo(object) {
+                let d_x = Math.pow(this.x - object.x, 2);
+                let d_y = Math.pow(this.y - object.y, 2);
+
+                return Math.sqrt(d_x + d_y);
+            }
+
+            hasCollisionWith(object) {
+                if (this.getDistanceTo(object) < this.r + object.r)
+                    return true;
+                else
+                    return false;
+            }
+        }
+
+
+        class DynamicCircle extends Circle {
+            constructor(x, y, r, imgUrl, speed) {
+                super(x, y, r, imgUrl);
+                this.speed = speed;
+            }
+
+            move(x, y) {
+                this.y += y;
+                this.x += x;
+            }
+            moveToPoint(x, y) {
+                let alpha = Math.atan2(y - this.y, x - this.x) / Math.PI * 180;
+                let deltaX = this.speed * Math.cos(alpha * (Math.PI / 180));
+                let deltaY = this.speed * Math.sin(alpha * (Math.PI / 180));
+
+                this.move(deltaX, deltaY);
+            }
+
+            moveToCursor() {
+                this.moveToPoint(cursor.x, cursor.y);
+            }
+        }
+
+
+        class Player extends DynamicCircle {
+            constructor(x, y, r, speed) {
+                super(x, y, r, 'https://my.informatics.ru/media/ck_uploads/abkadirov_rr/2019/03/06/happy-1.png', speed);
+            }
+        }
+
+
+        class Enemy extends DynamicCircle {
+            constructor(x, y, r, speed) {
+                super(x, y, r, 'https://my.informatics.ru/media/ck_uploads/abkadirov_rr/2019/03/06/monster-1.png', speed);
+                this.setTarget(player);
+            }
+            setTarget(object) {
+                this.targetX = object.x;
+                this.targetY = object.y;
+            }
+            moveToTarget() {
+                super.moveToPoint(this.targetX, this.targetY);
+            }
+            findTargetOf(array) {
+                if (array.length > 0) {
+
+                    let minDistance = this.getDistanceTo(array[0]);
+                    let minIndex = 0;
+
+
+                    for (let i in array) {
+                        if (this.getDistanceTo(array[i]) < minDistance) {
+                            minDistance = this.getDistanceTo(array[i]);
+                            minIndex = i;
+                        }
+                    }
+
+                    if (this.getDistanceTo(array[minIndex]) > this.getDistanceTo(player))
+                        this.setTarget(player);
+                    else
+                        this.setTarget(array[minIndex]);
+                } else
+                    this.setTarget(player);
+            }
+        }
+
+        class DynamicFood extends DynamicCircle {
+            getDistanceToPoint(x, y) {
+
+                let d_x = Math.pow(this.x - x, 2);
+                let d_y = Math.pow(this.y - y, 2);
+
+                return Math.sqrt(d_x + d_y);
+            }
+        }
+
+        class Bomb extends Circle {
+            reSpawn() {
+                this.x = getRandomInt(40, document.documentElement.clientWidth - 40);
+                this.y = getRandomInt(40, document.documentElement.clientHeight - 40);
+            }
+        }
+
+        class Bush extends Circle {}
+
+
+        // === ОСНОВНАЯ ЛОГИКА ИГРЫ ===================================================
+
+
+        let cursor = {
+            x: 0,
+            y: 0
+        }
+
+        game.addEventListener('mousemove', function(e) {
+            cursor.x = e.clientX - game.getBoundingClientRect().left;
+            cursor.y = e.clientY - game.getBoundingClientRect().top;
+        });
+
+
+
+        let targetsArr = [];
+
+        for (let i = 0; i < 50; i++) {
+            let x = getRandomInt(0, document.documentElement.clientWidth);
+            let y = getRandomInt(0, document.documentElement.clientHeight);
+            targetsArr.push(new Circle(x, y, 10, 'https://my.informatics.ru/media/ck_uploads/abkadirov_rr/2019/03/06/tomato.png'));
+        }
+
+
+        let BgImage = new Image();
+        BgImage.src = 'https://catherineasquithgallery.com/uploads/posts/2021-02/1613313434_64-p-sinee-more-fon-115.jpg';
+
+
+        let x = getRandomInt(30, document.documentElement.clientWidth - 30);
+        let y = getRandomInt(30, document.documentElement.clientHeight - 30);
+
+        let dynamicFood = new DynamicFood(x, y, 15, 'https://my.informatics.ru/media/ck_uploads/abkadirov_rr/2019/03/06/tomato.png', 2.4);
+
+
+        x = getRandomInt(30, document.documentElement.clientWidth - 30);
+        y = getRandomInt(30, document.documentElement.clientHeight - 30);
+
+        let bomb = new Bomb(x, y, 25, 'https://my.informatics.ru/media/ck_uploads/abkadirov_rr/2019/03/06/bomb.png');
+
+
+        x = getRandomInt(30, document.documentElement.clientWidth - 30);
+        y = getRandomInt(30, document.documentElement.clientHeight - 30);
+
+        let bush = new Bush(x, y, 25, 'https://my.informatics.ru/media/ck_uploads/abkadirov_rr/2019/03/06/bush.png');
+
+
+        let player = new Player(100, 100, 10, 2.5);
+
+
+        let enemysArr = [];
+
+        for (let i = 0; i < 3; i++) {
+            let x = getRandomInt(0, document.documentElement.clientWidth);
+            let y = getRandomInt(0, 400);
+            enemysArr.push(new Enemy(x, y, 12, 2));
+        }
+
+
+        // === ОСНОВНОЙ ЦИКЛ ИГРЫ =====================================================
+
+        let b = 0;
+
+        x = getRandomInt(30, document.documentElement.clientWidth - 30);
+        y = getRandomInt(30, document.documentElement.clientHeight - 30);
+
+        function updState() {
+            player.moveToCursor();
+
+            if (dynamicFood.getDistanceToPoint(x, y) <= 2) {
+                x = getRandomInt(30, document.documentElement.clientWidth - 30);
+                y = getRandomInt(30, document.documentElement.clientHeight - 30);
+            }
+
+            dynamicFood.moveToPoint(x, y);
+
+
+            for (let i in enemysArr) {
+                enemysArr[i].findTargetOf(targetsArr);
+                enemysArr[i].moveToTarget();
+            }
+
+
+            if (player.hasCollisionWith(dynamicFood)) {
+                player.r += 3;
+                delete dynamicFood.x;
+            }
+
+            if (player.hasCollisionWith(bomb)) {
+                bomb.reSpawn();
+                player.r -= player.r / 3;
+                if (player.r <= 1) {
+                    alert("Game Over");
+                    b = 1;
+                }
+            }
+
+            if (player.hasCollisionWith(bush)) {
+                if (bush.r <= player.r) {
+                    player.r -= player.r / 5;
+                }
+            }
+
+
+            for (let i in enemysArr) {
+                if (enemysArr[i].hasCollisionWith(dynamicFood)) {
+                    enemysArr[i].r += 3;
+                    delete dynamicFood.x;
+                }
+                if (enemysArr[i].hasCollisionWith(bomb)) {
+                    bomb.reSpawn();
+                    if (enemysArr[i].r > 10) {
+                        enemysArr[i].r -= enemysArr[i].r / 3;
+                    } else {
+                        enemysArr[i].r = 10;
+                    }
+                }
+                if (enemysArr[i].hasCollisionWith(player)) {
+
+                    if (enemysArr[i].r <= player.r) {
+                        player.r += enemysArr[i].r / 3;
+                        enemysArr.splice(i, 1);
+                    } else {
+                        alert("Game Over");
+                        b = 1;
+                    }
+
+                }
+            }
+
+
+            for (let i in targetsArr) {
+                if (player.hasCollisionWith(targetsArr[i])) {
+
+                    player.r += 1;
+                    player.speed -= 0.05;
+                    targetsArr.splice(i, 1);
+
+                } else {
+                    for (let j in enemysArr) {
+                        if (enemysArr[j].hasCollisionWith(targetsArr[i])) {
+
+                            enemysArr[j].r += 1;
+                            enemysArr[j].speed -= 0.05;
+                            targetsArr.splice(i, 1);
+
+                            break;
+                        }
+                    }
+                }
+            }
+
+            redraw();
+
+            if (enemysArr.length == 0 && targetsArr.length == 0) {
+                alert("You Win!");
+                b = 1;
+            }
+
+            if (b == 0) {
+                requestAnimationFrame(updState);
+            }
+        }
+
+        updState();
+
+
+
+
+        // == ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =================================================
+
+
+        function redraw() {
+
+            ctx.clearRect(0, 0, document.documentElement.clientWidth, document.documentElement.clientHeight);
+
+            ctx.drawImage(BgImage, 0, 0, document.documentElement.clientWidth, document.documentElement.clientHeight);
+
+            dynamicFood.draw();
+
+            bomb.draw();
+
+            bush.draw();
+
+            player.draw();
+
+            for (let index in targetsArr) {
+                targetsArr[index].draw();
+            }
+
+            for (let index in enemysArr) {
+                enemysArr[index].draw();
+            }
+        }
+
+
+        // генератор случайных чисел
+        // Возвращает случайное число между min (включительно) и max (не включая max)
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min) + min);
+        }
+
+    </script>
+</body>
+
+</html>
